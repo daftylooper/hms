@@ -17,8 +17,8 @@ class Department(models.Model):
     
 # a table holding the m:n relations beween hospital and department
 class HospitalDepartment(models.Model):
-    hospital_id = models.ForeignKey(Hospital, on_delete=models.CASCADE)
-    department_id = models.ForeignKey(Department, on_delete=models.CASCADE)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE)
     
     class Meta:
         unique_together = ('hospital', 'department')

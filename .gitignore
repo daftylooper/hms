@@ -4,3 +4,6 @@ include/
 bin/
 pyvenv.cfg
 *.txt
+src/*/__pycache__/
+src/*/migrations/
+.gitignore
