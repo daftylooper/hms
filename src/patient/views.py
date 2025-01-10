@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from datetime import datetime
 from .models import *
 from hospital.models import *
 from doctor.models import *
@@ -90,6 +91,15 @@ class VisitList(APIView):
                 obj = get_object_or_404(model, name=data.get(key))
                 data[key] = obj.id
 
+            #dont record a visit of the patient if they haven't been discharged from other places yet
+            patient_id = data["patient"]
+            last_visit = Visit.objects.filter(patient_id=patient_id).order_by('-timestamp').first()
+            if last_visit and last_visit.status != Visit.Status.DISCHARGED:
+                return Response(
+                    {"error": "Patient cannot create a new visit while still admitted or waiting"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             #check if the doctor is linked to the hospital and department
             hospital_id = data["hospital"]
             department_id = data["department"]
@@ -111,6 +121,13 @@ class VisitList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class VisitView(APIView):
+    def get_age(self, date):
+        today = date.today()
+        year_diff = today.year - date.year
+        if (today.month, today.day) < (date.month, date.day):
+            year_diff -= 1
+        return year_diff
+
     def get_object(self, pk):
         try:
             return Visit.objects.get(pk=pk)
@@ -118,14 +135,30 @@ class VisitView(APIView):
             return None
 
     def get(self, request, pk):
-        visit = self.get_object(pk)
-        # replace all patient, hospital, department, doctor ids with actual names
-        if not visit:
-            return Response(status.HTTP_400_BAD_REQUEST)
-        serializer = VisitSerializer(visit)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        try:
+            patient = get_object_or_404(Patient, pk=pk)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=status.HTTP_400_BAD_REQUEST)
+        visits = Visit.objects.filter(patient=patient).order_by('-timestamp')
+
+        if not visits.exists():
+            return Response({"message": "No visits found for this patient"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Serialize the visits
+        serializer = VisitSerializer(visits, many=True)
+        return Response({
+            "patient": {
+                "id": patient.id,
+                "name": patient.name,
+                "email": patient.email,
+                "address": patient.addr,
+                "phone": patient.phone,
+                "age": self.get_age(patient.dob)
+            },
+            "visits": serializer.data
+        }, status=status.HTTP_200_OK)
     
-    def put(self, request, pk): # can't think of the logic rn
+    def put(self, request, pk): # too lazy to write rn
         visit = self.get_object(pk)
         if not visit:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -141,3 +174,33 @@ class VisitView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         visit.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class StatusView(APIView):
+    def get_object(self, pk):
+        try:
+            return Visit.objects.get(pk=pk)
+        except Visit.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        visit = self.get_object(pk)
+        if not visit:
+            return Response(status.HTTP_400_BAD_REQUEST)
+        serializer = VisitSerializer(visit)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def put(self, request, pk):
+        try:
+            patient = get_object_or_404(Patient, pk=pk)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        visit = Visit.objects.filter(patient=patient).exclude(status=Visit.Status.DISCHARGED).order_by('-timestamp').first()
+        if not visit:
+            return Response({"error": "No active visits, cannot change status"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = VisitSerializer(visit, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
