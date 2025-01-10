@@ -25,7 +25,8 @@ class Visit(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.WAITING)
 
-    patient = models.ForeignKey(Patient, on_delete=models.SET_NULL, null=True) # a deleted patient wont affect related row in visit
+    # a deleted patient wont affect related row in visit
+    patient = models.ForeignKey(Patient, on_delete=models.SET_NULL, null=True)
     doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True)
     hospital = models.ForeignKey(Hospital, on_delete=models.SET_NULL, null=True)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True)
