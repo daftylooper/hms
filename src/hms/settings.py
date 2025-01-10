@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     #own
     'doctor',
     'hospital',
+    'patient',
 ]
 
 MIDDLEWARE = [

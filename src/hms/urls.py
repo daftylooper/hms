@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from hospital.views import *
 from doctor.views import *
+from patient.views import *
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,4 +28,6 @@ urlpatterns = [
     path('department/<int:pk>', DepartmentView.as_view(), name='Department View'),
     path('doctors', DoctorList.as_view(), name='Doctor List'),
     path('doctor/<int:pk>', DoctorView.as_view(), name='Doctor View'),
+    path('patients', PatientList.as_view(), name='Patient List'),
+    path('patient/<int:pk>', PatientView.as_view(), name='Patient View'),
 ]
