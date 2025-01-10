@@ -54,7 +54,6 @@ class HospitalList(APIView):
                 [HospitalDepartment(hospital=hospital, department=department) for department in new_departments]
             )
         
-
         return Response("donezo", status=status.HTTP_200_OK)
     
 class HospitalView(APIView):
