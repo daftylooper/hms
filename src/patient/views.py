@@ -7,8 +7,11 @@ from .models import *
 from hospital.models import *
 from doctor.models import *
 from .serializer import *
+from utils.tasks import send_email_task
+from dotenv import load_dotenv
 import json
 import re
+import os
 
 class PatientList(APIView):
     def get(self, request):
@@ -17,12 +20,22 @@ class PatientList(APIView):
         return Response(serializer.data)
     
     def post(self, request):
+        load_dotenv()
+
         serializer = PatientSerializer(data=request.data)
         if not bool(re.fullmatch(r"((\+*)((0[ -]*)*|((91 )*))((\d{12})+|(\d{10})+))|\d{5}([- ]*)\d{6}", request.data["phone"])):
             return Response("Enter a valid phone number", status=status.HTTP_400_BAD_REQUEST)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            name = request.data.get("name", "undefined")
+            result = send_email_task.delay(
+                "Patient Registered!",
+                f"Hello, {name}!\nYou have succesfully registered as a patient. Here are your details - \n {serializer.data}",
+                os.getenv("RECEIVER_MAIL")
+            )
+            return Response({"task_id": result.id, "status": "Task queued"}, status=status.HTTP_202_ACCEPTED)
+            # return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class PatientView(APIView):
