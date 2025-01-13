@@ -7,4 +7,4 @@ pyvenv.cfg
 !requirements.txt
 src/*/__pycache__/
 src/*/migrations/
-.gitignore
+.env

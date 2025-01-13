@@ -5,6 +5,7 @@ from django.template.response import ContentNotRenderedError
 from .models import *
 from hospital.models import *
 from .serializer import *
+from .tasks import *
 import json
 
 def get_hospital_id(hospital_name):
@@ -47,15 +48,15 @@ class DoctorList(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-        print("A")
-        doctor = Doctor.objects.create(
-            name=name,
-            hospital=hospital,
-            department=department
-        )
-        doctor_serializer = DoctorSerializer(doctor)
-        return Response(doctor_serializer.data, status=status.HTTP_201_CREATED)
-        # return Response(status=status.HTTP_201_CREATED)
+        # doctor = Doctor.objects.create(
+        #     name=name,
+        #     hospital=hospital,
+        #     department=department
+        # )
+        # doctor_serializer = DoctorSerializer(doctor)
+
+        result = create_object_task.delay(name, hospital, department)
+        return Response({"task_id": result.id, "status": "Task queued"}, status=status.HTTP_202_ACCEPTED)
     
 class DoctorView(APIView):
     def get_object(self, pk):

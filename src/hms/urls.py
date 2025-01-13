@@ -19,9 +19,11 @@ from django.urls import path
 from hospital.views import *
 from doctor.views import *
 from patient.views import *
+from utils.views import *
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('task/<uuid:task_id>', TaskView.as_view(), name="Task View"),
     path('hospitals', HospitalList.as_view(), name='Hospital List'),
     path('hospital/<int:pk>', HospitalView.as_view(), name='Hospital View'),
     path('departments', DepartmentList.as_view(), name='Department List'),
