@@ -1,8 +1,14 @@
 import inspect
 from datetime import datetime
 
-# log levels - DEBUG, INFO, WARNING, ERROR, CRITICAL
+class LogLevel:
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR" 
+    CRITICAL = "CRITICAL"
 
+# log levels - DEBUG, INFO, WARNING, ERROR, CRITICAL
 def log(level, message):
     # get calling frame context
     frame = inspect.currentframe().f_back
@@ -28,6 +34,8 @@ def log(level, message):
 
     log_message = f"[{formatted_time}] [{level.upper()}] [{context}] {message}"
     print(log_message)
+
+Level = LogLevel()
 
 # class ExampleClass:
 #     def example_method(self):

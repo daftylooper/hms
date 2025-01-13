@@ -12,8 +12,8 @@ class Patient(models.Model):
     phone = models.BigIntegerField()
     email = models.EmailField()
 
-    def __str__(self):
-        return f"patient@{self.id}@{self.name}"
+    # def __str__(self):
+    #     return f"patient@{self.id}@{self.name}"
 
 class Visit(models.Model):
     class Status(models.TextChoices):

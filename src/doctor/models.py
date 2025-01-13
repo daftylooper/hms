@@ -1,7 +1,6 @@
 from django.db import models
 from hospital.models import Hospital, Department
 
-# Create your models here.
 class Doctor(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=128)

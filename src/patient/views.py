@@ -33,7 +33,8 @@ class PatientList(APIView):
                 f"Hello, {name}!\nYou have succesfully registered as a patient. Here are your details - \n {serializer.data}",
                 os.getenv("RECEIVER_MAIL")
             )
-            return Response({"task_id": result.id, "status": "Task queued"}, status=status.HTTP_202_ACCEPTED)
+            serializer.data["task_id"] = result.id
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
             # return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
