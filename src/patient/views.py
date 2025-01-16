@@ -9,22 +9,32 @@ from doctor.models import *
 from .serializer import *
 from utils.tasks import send_email_task
 from dotenv import load_dotenv
+from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth.decorators import permission_required
+from django.utils.decorators import method_decorator
 import json
 import re
 import os
 
 class PatientList(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @method_decorator(permission_required('patient.view_patient', raise_exception=True))
     def get(self, request):
         visits = Patient.objects.all()
         serializer = PatientSerializer(visits, many=True)
         return Response(serializer.data)
     
+    @method_decorator(permission_required('patient.change_patient', raise_exception=True))
     def post(self, request):
         load_dotenv()
 
         serializer = PatientSerializer(data=request.data)
-        if not bool(re.fullmatch(r"((\+*)((0[ -]*)*|((91 )*))((\d{12})+|(\d{10})+))|\d{5}([- ]*)\d{6}", request.data["phone"])):
+        phone, email = request.data["phone"], request.data["email"]
+        if not bool(re.fullmatch(r"((\+*)((0[ -]*)*|((91 )*))((\d{12})+|(\d{10})+))|\d{5}([- ]*)\d{6}", phone)):
             return Response("Enter a valid phone number", status=status.HTTP_400_BAD_REQUEST)
+        serializer.validate_phone(phone)
+        serializer.validate_email(email)
         if serializer.is_valid():
             serializer.save()
             name = request.data.get("name", "undefined")
@@ -40,12 +50,15 @@ class PatientList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class PatientView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get_object(self, pk):
         try:
             return Patient.objects.get(pk=pk)
         except Patient.DoesNotExist:
             return None
 
+    @method_decorator(permission_required('patient.view_patient', raise_exception=True))
     def get(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
@@ -53,6 +66,7 @@ class PatientView(APIView):
         serializer = PatientSerializer(visit)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @method_decorator(permission_required('patient.change_patient', raise_exception=True))
     def put(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
@@ -63,6 +77,7 @@ class PatientView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @method_decorator(permission_required('patient.delete_patient', raise_exception=True))
     def delete(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
@@ -71,7 +86,10 @@ class PatientView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class VisitList(APIView):
+    permission_classes = [IsAuthenticated]
+
     # replace all patient, hospital, department, doctor ids with actual names
+    @method_decorator(permission_required('patient.view_patient', raise_exception=True))
     def get(self, request):
         visits = Visit.objects.select_related(
             'patient', 'hospital', 'department', 'doctor'
@@ -91,6 +109,7 @@ class VisitList(APIView):
 
         return Response(visit_data, status=status.HTTP_200_OK)
     
+    @method_decorator(permission_required('patient.change_patient', raise_exception=True))    
     def post(self, request):
         data = request.data
         model_mapping = {
@@ -135,6 +154,8 @@ class VisitList(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class VisitView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def get_age(self, date):
         today = date.today()
         year_diff = today.year - date.year
@@ -148,6 +169,7 @@ class VisitView(APIView):
         except Visit.DoesNotExist:
             return None
 
+    @method_decorator(permission_required('patient.view_visit', raise_exception=True))
     def get(self, request, pk):
         try:
             patient = get_object_or_404(Patient, pk=pk)
@@ -172,6 +194,7 @@ class VisitView(APIView):
             "visits": serializer.data
         }, status=status.HTTP_200_OK)
     
+    @method_decorator(permission_required('patient.change_visit', raise_exception=True))
     def put(self, request, pk): # too lazy to write rn
         visit = self.get_object(pk)
         if not visit:
@@ -182,6 +205,7 @@ class VisitView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @method_decorator(permission_required('patient.delete_visit', raise_exception=True))
     def delete(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
@@ -190,12 +214,15 @@ class VisitView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 class StatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get_object(self, pk):
         try:
             return Visit.objects.get(pk=pk)
         except Visit.DoesNotExist:
             return None
 
+    @method_decorator(permission_required('patient.view_status', raise_exception=True))
     def get(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
@@ -203,6 +230,7 @@ class StatusView(APIView):
         serializer = VisitSerializer(visit)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @method_decorator(permission_required('patient.change_status', raise_exception=True))
     def put(self, request, pk):
         try:
             patient = get_object_or_404(Patient, pk=pk)

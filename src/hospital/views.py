@@ -4,22 +4,21 @@ from rest_framework import status
 from django.db import IntegrityError
 from .models import *
 from .serializer import *
+from django.contrib.auth.decorators import permission_required
+from django.utils.decorators import method_decorator
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 import json
 
-# Create your views here.
-
-# GET - /hospital, /department/<id> - departments of which hospital? 
-# POST ->
-#     /hospital/<id>({departments:[...]})
-# PUT - /hospital/<id>, /department/<id>
-# DELETE - /hospital/<id>, /department/<id>
-
 class HospitalList(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @method_decorator(permission_required('hospital.view_hospital', raise_exception=True))
     def get(self, request):
         products = Hospital.objects.all()
         serializer = HospitalSerializer(products, many=True)
         return Response(serializer.data)
 
+    @method_decorator(permission_required('hospital.change_patient', raise_exception=True))
     def post(self, request):
         body = json.loads(request.body)
         hospital_name, department_names, addr = body["name"], body["departments"], None
@@ -57,12 +56,15 @@ class HospitalList(APIView):
         return Response("donezo", status=status.HTTP_200_OK)
     
 class HospitalView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get_object(self, pk):
         try:
             return Hospital.objects.get(pk=pk)
         except Hospital.DoesNotExist:
             return None
 
+    @method_decorator(permission_required('hospital.view_hospital', raise_exception=True))
     def get(self, request, pk):
         hospital = self.get_object(pk)
         if not hospital:
@@ -72,6 +74,7 @@ class HospitalView(APIView):
     
     # add hospital if it doesn't exist, if exists, add intersection of departments, if certain departments exist and hospital is new, make connection from existing departments to new hospital
 
+    @method_decorator(permission_required('hospital.change_hospital', raise_exception=True))
     def put(self, request, pk):
         hospital = self.get_object(pk)
         if not hospital:
@@ -82,6 +85,7 @@ class HospitalView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @method_decorator(permission_required('hospital.delete_hospital', raise_exception=True))
     def delete(self, request, pk):
         hospital = self.get_object(pk)
         if not hospital:
@@ -90,18 +94,24 @@ class HospitalView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class DepartmentList(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @method_decorator(permission_required('hospital.view_department', raise_exception=True))
     def get(self, request):
         products = Department.objects.all()
         serializer = DepartmentSerializer(products, many=True)
         return Response(serializer.data)
     
 class DepartmentView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def get_object(self, pk):
         try:
             return Department.objects.get(pk=pk)
         except Department.DoesNotExist:
             return None
 
+    @method_decorator(permission_required('hospital.view_department', raise_exception=True))
     def get(self, request, pk):
         department = self.get_object(pk)
         if not department:
@@ -109,6 +119,7 @@ class DepartmentView(APIView):
         serializer = DepartmentSerializer(department)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @method_decorator(permission_required('hospital.change_department', raise_exception=True))
     def put(self, request, pk):
         department = self.get_object(pk)
         if not department:
@@ -119,6 +130,7 @@ class DepartmentView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @method_decorator(permission_required('hospital.delete_department', raise_exception=True))
     def delete(self, request, pk):
         department = self.get_object(pk)
         if not department:
