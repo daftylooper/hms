@@ -49,8 +49,11 @@ INSTALLED_APPS = [
 
     #outside
     'rest_framework',
+    'django_celery_results',
+    'django_celery_beat',
 
     #own
+    'hms',
     'doctor',
     'hospital',
     'patient',
@@ -65,6 +68,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    #self
+    # 'hms.middleware.LogRequestDataMiddleware',
 ]
 
 ROOT_URLCONF = 'hms.urls'

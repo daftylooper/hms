@@ -14,19 +14,19 @@ import os
 load_dotenv()
 alog = Log()
 
-@receiver(post_save, sender=Patient)
-def patient_post_save(sender, instance, created, *args, **kwargs):
-    if created:
-        log(Level.INFO, "Save Action Recorded into Action Log!")
-        alog.log_action(f"POST REQUEST: Saved Patient Instance - {instance.id}")
-    # else:
-    #     log(Level.ERROR, "Object Couldn't Be Saved to Table!")
-    #     alog.log_action("POST REQUEST: Couldn't Save Doctor Instance")
+# @receiver(post_save, sender=Patient)
+# def patient_post_save(sender, instance, created, *args, **kwargs):
+#     if created:
+#         log(Level.INFO, "Save Action Recorded into Action Log!")
+#         alog.log_action(f"POST REQUEST: Saved Patient Instance - {instance.id}")
+#     # else:
+#     #     log(Level.ERROR, "Object Couldn't Be Saved to Table!")
+#     #     alog.log_action("POST REQUEST: Couldn't Save Doctor Instance")
 
-@receiver(post_delete, sender=Patient)
-def patient_post_delete(sender, instance, using, *args, **kwargs):
-    log(Level.INFO, "Delete Action Recorded into Action Log!")
-    alog.log_action(f"DELETE REQUEST: Delete Patient Instance - {instance.id}")
+# @receiver(post_delete, sender=Patient)
+# def patient_post_delete(sender, instance, using, *args, **kwargs):
+#     log(Level.INFO, "Delete Action Recorded into Action Log!")
+#     alog.log_action(f"DELETE REQUEST: Delete Patient Instance - {instance.id}")
 
 @receiver(post_save, sender=Patient)
 def create_user_post_save(sender, instance, created, *args, **kwargs):
@@ -43,7 +43,7 @@ def create_user_post_save(sender, instance, created, *args, **kwargs):
         user.save()
 
 @receiver(post_delete, sender=Patient)
-def patient_post_delete(sender, instance, using, *args, **kwargs):
+def delete_user_post_delete(sender, instance, using, *args, **kwargs):
     deleted_count, _ = User.objects.filter(email=instance.email).delete()
     if deleted_count > 0:
         log(Level.INFO, f"User {instance.name} with email deleted successfully.")
