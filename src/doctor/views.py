@@ -5,7 +5,9 @@ from django.template.response import ContentNotRenderedError
 from .models import *
 from hospital.models import *
 from .serializer import *
-from .tasks import *
+from django.contrib.auth.decorators import permission_required
+from django.utils.decorators import method_decorator
+from rest_framework.permissions import IsAuthenticated
 import json
 
 def get_hospital_id(hospital_name):
@@ -28,11 +30,15 @@ def check_valid_pair(hospital_name, department_name):
     return [hospital, department, is_valid]
 
 class DoctorList(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @method_decorator(permission_required('doctor.view_doctor', raise_exception=True))
     def get(self, request):
         doctors = Doctor.objects.all()
         serializer = DoctorSerializer(doctors, many=True)
         return Response(serializer.data)
     
+    @method_decorator(permission_required('doctor.change_doctor', raise_exception=True))
     def post(self, request):
         body = json.loads(request.body)
         try:
@@ -48,23 +54,24 @@ class DoctorList(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-        # doctor = Doctor.objects.create(
-        #     name=name,
-        #     hospital=hospital,
-        #     department=department
-        # )
-        # doctor_serializer = DoctorSerializer(doctor)
-
-        result = create_object_task.delay(name, hospital, department)
-        return Response({"task_id": result.id, "status": "Task queued"}, status=status.HTTP_202_ACCEPTED)
+        doctor = Doctor.objects.create(
+            name=name,
+            hospital=hospital,
+            department=department
+        )
+        doctor_serializer = DoctorSerializer(doctor)
+        return Response(doctor_serializer.data, status=status.HTTP_202_ACCEPTED)
     
 class DoctorView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get_object(self, pk):
         try:
             return Doctor.objects.get(pk=pk)
         except Doctor.DoesNotExist:
             return None
 
+    @method_decorator(permission_required('doctor.view_doctor', raise_exception=True))
     def get(self, request, pk):
         doctor = self.get_object(pk)
         if not doctor:
@@ -72,6 +79,7 @@ class DoctorView(APIView):
         serializer = DoctorSerializer(doctor)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    @method_decorator(permission_required('doctor.change_doctor', raise_exception=True))
     def put(self, request, pk):
         body = json.loads(request.body)
         doctor = self.get_object(pk)
@@ -97,6 +105,7 @@ class DoctorView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @method_decorator(permission_required('doctor.delete_doctor', raise_exception=True))
     def delete(self, request, pk):
         doctor = self.get_object(pk)
         if not doctor:

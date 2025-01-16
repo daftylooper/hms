@@ -8,3 +8,4 @@ pyvenv.cfg
 src/*/__pycache__/
 src/*/migrations/
 .env
+db.sqlite3

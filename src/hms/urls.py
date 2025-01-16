@@ -20,9 +20,16 @@ from hospital.views import *
 from doctor.views import *
 from patient.views import *
 from utils.views import *
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
     path('task/<uuid:task_id>', TaskView.as_view(), name="Task View"),
     path('hospitals', HospitalList.as_view(), name='Hospital List'),
     path('hospital/<int:pk>', HospitalView.as_view(), name='Hospital View'),
