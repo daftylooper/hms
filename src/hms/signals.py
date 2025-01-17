@@ -17,6 +17,7 @@ def model_to_json(instance):
             continue
     return serialized
 
+# even log PUT and PATCH requests
 def log_model_save(sender, instance, created, **kwargs):
     if created:
         log(Level.INFO, f"Save Action Recorded into Action Log for {sender.__name__}!")

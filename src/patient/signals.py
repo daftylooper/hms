@@ -38,9 +38,13 @@ def create_user_post_save(sender, instance, created, *args, **kwargs):
             password=make_password('default') # user is created by hospital staff, user should be allowed to change password later
         )
 
+
         group = Group.objects.get(name="PatientUser")
         user.groups.add(group)
         user.save()
+
+        print("fool of a took", user.id)
+        instance.populate_userid(user)
 
 @receiver(post_delete, sender=Patient)
 def delete_user_post_delete(sender, instance, using, *args, **kwargs):

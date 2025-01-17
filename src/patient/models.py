@@ -2,6 +2,7 @@ from django.db import models
 from doctor.models import Doctor
 from hospital.models import *
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 # Create your models here.
 class Patient(models.Model):
@@ -11,6 +12,12 @@ class Patient(models.Model):
     addr = models.CharField(max_length=128)
     phone = models.BigIntegerField()
     email = models.EmailField()
+    user_id = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True) # blank because it is updates post user creation
+
+    def populate_userid(self, user_id):
+        if not self.user_id: # only update if user_id blank
+            self.user_id = user_id
+            self.save(update_fields=['user_id'])
 
     # def __str__(self):
     #     return f"patient@{self.id}@{self.name}"

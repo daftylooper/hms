@@ -9,18 +9,36 @@ from doctor.models import *
 from .serializer import *
 from utils.tasks import send_email_task
 from dotenv import load_dotenv
-from rest_framework.permissions import IsAuthenticated
+from functools import wraps
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth.decorators import permission_required
 from django.utils.decorators import method_decorator
+from django.core.exceptions import PermissionDenied
 import json
 import re
 import os
 
+# tries to match user_id and caller patient_id
+def check_authorisation(func):
+    @wraps(func)
+    def wrapper(request, pk, *args, **kwargs):
+        try:
+            patient = Patient.objects.get(pk=pk)
+            if patient.user_id.id != request.user.id:
+                raise PermissionDenied("You are not authorised to access this patient's information.")
+        except Patient.DoesNotExist:
+            raise PermissionDenied("Patient not found.")
+        return func(request, pk, *args, **kwargs)
+
+    return wrapper
+
 class PatientList(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     @method_decorator(permission_required('patient.view_patient', raise_exception=True))
     def get(self, request):
+        if not request.user.is_staff:
+            return Response("You are not allowed", status=status.HTTP_403_FORBIDDEN)
         visits = Patient.objects.all()
         serializer = PatientSerializer(visits, many=True)
         return Response(serializer.data)
@@ -28,6 +46,9 @@ class PatientList(APIView):
     @method_decorator(permission_required('patient.change_patient', raise_exception=True))
     def post(self, request):
         load_dotenv()
+
+        if not request.user.is_staff:
+            return Response("You are not allowed", status=status.HTTP_403_FORBIDDEN)
 
         serializer = PatientSerializer(data=request.data)
         phone, email = request.data["phone"], request.data["email"]
@@ -52,6 +73,10 @@ class PatientList(APIView):
 class PatientView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def dispatch(self, request, *args, **kwargs):
+        request = decode_jwt(request)
+        return super().dispatch(request, *args, **kwargs)
+
     def get_object(self, pk):
         try:
             return Patient.objects.get(pk=pk)
@@ -59,6 +84,7 @@ class PatientView(APIView):
             return None
 
     @method_decorator(permission_required('patient.view_patient', raise_exception=True))
+    @method_decorator(check_authorisation)
     def get(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
@@ -67,11 +93,24 @@ class PatientView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @method_decorator(permission_required('patient.change_patient', raise_exception=True))
+    @method_decorator(check_authorisation)
     def put(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         serializer = PatientSerializer(visit, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @method_decorator(permission_required('patient.change_patient', raise_exception=True))
+    @method_decorator(check_authorisation)
+    def patch(self, request, pk):
+        visit = self.get_object(pk)
+        if not visit:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        serializer = PatientSerializer(visit, data=request.data, partial=True)  # Use partial=True
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -86,10 +125,10 @@ class PatientView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class VisitList(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser] 
 
     # replace all patient, hospital, department, doctor ids with actual names
-    @method_decorator(permission_required('patient.view_patient', raise_exception=True))
+    @method_decorator(permission_required('patient.view_visit', raise_exception=True))
     def get(self, request):
         visits = Visit.objects.select_related(
             'patient', 'hospital', 'department', 'doctor'
@@ -109,7 +148,7 @@ class VisitList(APIView):
 
         return Response(visit_data, status=status.HTTP_200_OK)
     
-    @method_decorator(permission_required('patient.change_patient', raise_exception=True))    
+    @method_decorator(permission_required('patient.change_visit', raise_exception=True))
     def post(self, request):
         data = request.data
         model_mapping = {
@@ -155,6 +194,10 @@ class VisitList(APIView):
     
 class VisitView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def dispatch(self, request, *args, **kwargs):
+        request = decode_jwt(request)
+        return super().dispatch(request, *args, **kwargs)
     
     def get_age(self, date):
         today = date.today()
@@ -170,6 +213,7 @@ class VisitView(APIView):
             return None
 
     @method_decorator(permission_required('patient.view_visit', raise_exception=True))
+    @method_decorator(check_authorisation)
     def get(self, request, pk):
         try:
             patient = get_object_or_404(Patient, pk=pk)
@@ -216,6 +260,10 @@ class VisitView(APIView):
 class StatusView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def dispatch(self, request, *args, **kwargs):
+        request = decode_jwt(request)
+        return super().dispatch(request, *args, **kwargs)
+
     def get_object(self, pk):
         try:
             return Visit.objects.get(pk=pk)
@@ -223,6 +271,7 @@ class StatusView(APIView):
             return None
 
     @method_decorator(permission_required('patient.view_status', raise_exception=True))
+    @method_decorator(check_authorisation)
     def get(self, request, pk):
         visit = self.get_object(pk)
         if not visit:
