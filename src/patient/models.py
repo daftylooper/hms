@@ -10,7 +10,7 @@ class Patient(models.Model):
     name = models.CharField(max_length=128)
     dob = models.DateField(default="2000-01-01")
     addr = models.CharField(max_length=128)
-    phone = models.BigIntegerField()
+    phone = models.CharField(max_length=1024, null=True, blank=True)
     email = models.EmailField()
     user_id = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True) # blank because it is updates post user creation
 

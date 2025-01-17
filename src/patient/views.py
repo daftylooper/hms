@@ -24,7 +24,7 @@ def check_authorisation(func):
     def wrapper(request, pk, *args, **kwargs):
         try:
             patient = Patient.objects.get(pk=pk)
-            if patient.user_id.id != request.user.id:
+            if not request.user.is_staff and patient.user_id.id != request.user.id:
                 raise PermissionDenied("You are not authorised to access this patient's information.")
         except Patient.DoesNotExist:
             raise PermissionDenied("Patient not found.")
@@ -39,8 +39,8 @@ class PatientList(APIView):
     def get(self, request):
         if not request.user.is_staff:
             return Response("You are not allowed", status=status.HTTP_403_FORBIDDEN)
-        visits = Patient.objects.all()
-        serializer = PatientSerializer(visits, many=True)
+        patients = Patient.objects.all()
+        serializer = PatientSerializer(patients, many=True)
         return Response(serializer.data)
     
     @method_decorator(permission_required('patient.change_patient', raise_exception=True))
@@ -72,10 +72,6 @@ class PatientList(APIView):
     
 class PatientView(APIView):
     permission_classes = [IsAuthenticated]
-
-    def dispatch(self, request, *args, **kwargs):
-        request = decode_jwt(request)
-        return super().dispatch(request, *args, **kwargs)
 
     def get_object(self, pk):
         try:
