@@ -17,26 +17,77 @@ def model_to_json(instance):
             continue
     return serialized
 
-# even log PUT and PATCH requests
+from django.core.handlers.wsgi import WSGIRequest
+import threading
+import json
+
 def log_model_save(sender, instance, created, **kwargs):
     try:
-        if created:
-            log(Level.INFO, f"Save Action Recorded into Action Log for {sender.__name__}!")
-            alog.log_action(f"POST REQUEST: Saved {sender.__name__} Instance - {instance.id}")
+        # Get current request from thread local storage
+        request = getattr(threading.current_thread(), '_current_request', None)
+        
+        # Prepare metadata
+        metadata = {
+            'model': sender.__name__,
+            'instance_id': instance.id,
+            'instance_data': str(instance)  # or a more detailed serialization if needed
+        }
+
+        # Determine action type
+        method = 'POST' if created else 'PUT/PATCH'
+        action_type = 'Created' if created else 'Updated'
+        
+        # Create log entry
+        alog.log_action(
+            action=f"{method} REQUEST: {action_type} {sender.__name__} Instance - {instance.id}",
+            actor=getattr(request, 'jwt_user', None) if request else None,
+            ip_address=getattr(request, 'client_ip', None) if request else None,
+            method=method,
+            metadata=metadata
+        )
+        
+        log(Level.INFO, f"{action_type} Action Recorded into Action Log for {sender.__name__}!")
     except AttributeError:
         pass
     except Exception as e:
         log(Level.ERROR, f"Error in log_model_save: {e}")
 
+# def log_model_delete(sender, instance, **kwargs):
+#     try:
+#         log(Level.INFO, f"Delete Action Recorded into Action Log for {sender.__name__}!")
+#         alog.log_action(f"DELETE REQUEST: Deleted {sender.__name__} Instance - {instance.id} - {json.dumps(model_to_json(instance))}")
+#     except AttributeError:
+#         pass
+#     except Exception as e:
+#         log(Level.ERROR, f"Error in log_model_delete: {e}")
+
 def log_model_delete(sender, instance, **kwargs):
     try:
+        # Get current request from thread local storage
+        request = getattr(threading.current_thread(), '_current_request', None)
+        
+        # Prepare metadata - capture instance data before deletion
+        metadata = {
+            'model': sender.__name__,
+            'instance_id': instance.id,
+            'instance_data': str(instance)  # or a more detailed serialization if needed
+        }
+        
+        # Create log entry
+        alog.log_action(
+            action=f"DELETE REQUEST: Deleted {sender.__name__} Instance - {instance.id}",
+            actor=getattr(request, 'jwt_user', None) if request else None,
+            ip_address=getattr(request, 'client_ip', None) if request else None,
+            method='DELETE',
+            metadata=metadata
+        )
+        
         log(Level.INFO, f"Delete Action Recorded into Action Log for {sender.__name__}!")
-        alog.log_action(f"DELETE REQUEST: Deleted {sender.__name__} Instance - {instance.id} - {json.dumps(model_to_json(instance))}")
     except AttributeError:
         pass
     except Exception as e:
         log(Level.ERROR, f"Error in log_model_delete: {e}")
-        
+
 # tracking all models, attach a signal
 excluded = [Log] # dont log the log because recursion
 for model in apps.get_models():
