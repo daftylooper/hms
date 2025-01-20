@@ -71,6 +71,8 @@ MIDDLEWARE = [
 
     #self
     # 'hms.middleware.LogRequestDataMiddleware',
+    'utils.middleware.RequestMiddleware',
+    'utils.middleware.AuditLogMiddleware',
 ]
 
 ROOT_URLCONF = 'hms.urls'

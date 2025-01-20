@@ -1,3 +1,4 @@
+import os
 import inspect
 from datetime import datetime
 
@@ -8,9 +9,15 @@ class LogLevel:
     ERROR = "ERROR" 
     CRITICAL = "CRITICAL"
 
-# log levels - DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+LOG_DIR = "logs"
+LOG_FILE = os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+# Ensure log directory exists
+os.makedirs(LOG_DIR, exist_ok=True)
+
 def log(level, message):
-    # get calling frame context
+# get calling frame context
     frame = inspect.currentframe().f_back
     file_name = frame.f_code.co_filename
     line_number = frame.f_lineno
@@ -33,6 +40,10 @@ def log(level, message):
         context += f" {function_name}"
 
     log_message = f"[{formatted_time}] [{level.upper()}] [{context}] {message}"
+    
+    with open(LOG_FILE, 'a') as f:
+        f.write(log_message + '\n')
+
     print(log_message)
 
 Level = LogLevel()

@@ -8,5 +8,5 @@ class Doctor(models.Model):
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE)
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
 
-    # def __str__(self):
-    #     return f"doctor@{self.id}@{self.name}"
+    def __str__(self):
+        return self.name
