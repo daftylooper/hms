@@ -13,16 +13,16 @@ import json
 def get_hospital_id(hospital_name):
     try:
         hospital = Hospital.objects.get(name=hospital_name)
+        return hospital.id  # Return the hospital ID
     except Hospital.DoesNotExist:
-        return Response({"error": f"Hospital '{hospital_name}' not found."}, status=status.HTTP_404_NOT_FOUND)
-    return hospital
+        return None
 
 def get_department_id(department_name):
     try:
         department = Department.objects.get(name=department_name)
+        return department.id  # Return the department ID
     except Department.DoesNotExist:
-        return Response({"error": f"Department '{department_name}' not found."}, status=status.HTTP_404_NOT_FOUND)
-    return department
+        return None
 
 def check_valid_pair(hospital_name, department_name):
     hospital, department = get_hospital_id(hospital_name), get_department_id(department_name)
@@ -41,19 +41,24 @@ class DoctorList(APIView):
     @method_decorator(permission_required('doctor.change_doctor', raise_exception=True))
     def post(self, request):
         body = json.loads(request.body)
+
         try:
             name, hospital_name, department_name = body["name"], body["hospital"], body["department"]
         except KeyError as e:
-            return Response(e, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid request body "+str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
         # retrieve hospital and department ids from name, ig they can conflict if two hospitals have same names
-        hospital, department, is_valid_pair = check_valid_pair(hospital_name, department_name)
+        hospital_id, department_id, is_valid_pair = check_valid_pair(hospital_name, department_name)
         if not is_valid_pair:
             return Response(
                 {"error": f"The hospital '{hospital_name}' and department '{department_name}' are not linked."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
+        
+        # Get Hospital and Department instances from their IDs
+        hospital = Hospital.objects.get(id=hospital_id)
+        department = Department.objects.get(id=department_id)
+
         doctor = Doctor.objects.create(
             name=name,
             hospital=hospital,
@@ -83,26 +88,33 @@ class DoctorView(APIView):
     def put(self, request, pk):
         body = json.loads(request.body)
         doctor = self.get_object(pk)
-        hospital, department = doctor.hospital.id, doctor.department.id
-
         if not doctor:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        if "hospital" in body:
-            hospital = get_hospital_id(body["hospital"])
-        if "department" in body:
-            department = get_department_id(body["department"])
-        valid_pair = HospitalDepartment.objects.filter(hospital=hospital, department=department).exists()
-        if not valid_pair:
+        
+        try:
+            name, hospital_name, department_name = body["name"], body["hospital"], body["department"]
+        except KeyError as e:
+            return Response(e, status=status.HTTP_400_BAD_REQUEST)
+
+        hospital, department, is_valid_pair = check_valid_pair(hospital_name, department_name)
+        if not is_valid_pair:
             return Response(
-                {"error": f"The hospital and department are not linked."},
+                {"error": f"The hospital '{hospital_name}' and department '{department_name}' are not linked."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        request.data["hospital"], request.data["department"] = hospital.id, department.id
-        serializer = DoctorSerializer(doctor, data=request.data)
+        # Create validated data dictionary with IDs instead of names
+        validated_data = {
+            'name': name,
+            'hospital': hospital,
+            'department': department
+        }
+        
+        serializer = DoctorSerializer(doctor, data=validated_data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @method_decorator(permission_required('doctor.delete_doctor', raise_exception=True))

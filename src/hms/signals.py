@@ -19,14 +19,24 @@ def model_to_json(instance):
 
 # even log PUT and PATCH requests
 def log_model_save(sender, instance, created, **kwargs):
-    if created:
-        log(Level.INFO, f"Save Action Recorded into Action Log for {sender.__name__}!")
-        alog.log_action(f"POST REQUEST: Saved {sender.__name__} Instance - {instance.id}")
+    try:
+        if created:
+            log(Level.INFO, f"Save Action Recorded into Action Log for {sender.__name__}!")
+            alog.log_action(f"POST REQUEST: Saved {sender.__name__} Instance - {instance.id}")
+    except AttributeError:
+        pass
+    except Exception as e:
+        log(Level.ERROR, f"Error in log_model_save: {e}")
 
 def log_model_delete(sender, instance, **kwargs):
-    log(Level.INFO, f"Delete Action Recorded into Action Log for {sender.__name__}!")
-    alog.log_action(f"DELETE REQUEST: Deleted {sender.__name__} Instance - {instance.id} - {json.dumps(model_to_json(instance))}")
-
+    try:
+        log(Level.INFO, f"Delete Action Recorded into Action Log for {sender.__name__}!")
+        alog.log_action(f"DELETE REQUEST: Deleted {sender.__name__} Instance - {instance.id} - {json.dumps(model_to_json(instance))}")
+    except AttributeError:
+        pass
+    except Exception as e:
+        log(Level.ERROR, f"Error in log_model_delete: {e}")
+        
 # tracking all models, attach a signal
 excluded = [Log] # dont log the log because recursion
 for model in apps.get_models():
