@@ -17,30 +17,34 @@ LOG_FILE = os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')
 os.makedirs(LOG_DIR, exist_ok=True)
 
 def log(level, message):
-# get calling frame context
+    # get the frame of the caller
     frame = inspect.currentframe().f_back
-    file_name = frame.f_code.co_filename
-    line_number = frame.f_lineno
+    
+    file_name = frame.f_code.co_filename  # get file name of where called
+    line_number = frame.f_lineno         # line number
+    function_name = frame.f_code.co_name # name of calling function
 
-    function_name = frame.f_code.co_name
+    # check if called from class method
     class_name = None
     for cls in inspect.getouterframes(frame):
         if cls.function != '<module>':
+            # if frame is not of type module( function ) and has self, then it is a class method
             if 'self' in frame.f_locals:
                 class_name = frame.f_locals['self'].__class__.__name__
             break
 
-    # build log details
     now = datetime.now()
     formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    # build context string, basically the log
     context = f"{file_name}:{line_number}"
     if class_name:
         context += f" {class_name}.{function_name}"
     else:
         context += f" {function_name}"
 
+    # build the log message
     log_message = f"[{formatted_time}] [{level.upper()}] [{context}] {message}"
-    
     with open(LOG_FILE, 'a') as f:
         f.write(log_message + '\n')
 

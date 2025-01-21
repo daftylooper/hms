@@ -7,6 +7,7 @@ from .serializer import *
 from django.contrib.auth.decorators import permission_required
 from django.utils.decorators import method_decorator
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from django.core.cache import cache
 import json
 
 class HospitalList(APIView):
@@ -14,8 +15,12 @@ class HospitalList(APIView):
 
     @method_decorator(permission_required('hospital.view_hospital', raise_exception=True))
     def get(self, request):
+        cached_data = cache.get('hospital_list')
+        if cached_data is not None:
+            return Response(cached_data, status=status.HTTP_200_OK)
         products = Hospital.objects.all()
         serializer = HospitalSerializer(products, many=True)
+        cache.set('hospital_list', serializer.data, timeout=60*10)
         return Response(serializer.data)
 
     @method_decorator(permission_required('hospital.change_patient', raise_exception=True))
@@ -66,10 +71,14 @@ class HospitalView(APIView):
 
     @method_decorator(permission_required('hospital.view_hospital', raise_exception=True))
     def get(self, request, pk):
+        cached_data = cache.get(f'hospital_{pk}')
+        if cached_data is not None:
+            return Response(cached_data, status=status.HTTP_200_OK)
         hospital = self.get_object(pk)
         if not hospital:
             return Response(status.HTTP_400_BAD_REQUEST)
         serializer = HospitalSerializer(hospital)
+        cache.set(f'hospital_{pk}', serializer.data, timeout=60*10)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     # add hospital if it doesn't exist, if exists, add intersection of departments, if certain departments exist and hospital is new, make connection from existing departments to new hospital
@@ -98,8 +107,12 @@ class DepartmentList(APIView):
 
     @method_decorator(permission_required('hospital.view_department', raise_exception=True))
     def get(self, request):
+        cached_data = cache.get('department_list')
+        if cached_data is not None:
+            return Response(cached_data, status=status.HTTP_200_OK)
         products = Department.objects.all()
         serializer = DepartmentSerializer(products, many=True)
+        cache.set('department_list', serializer.data, timeout=60*10)
         return Response(serializer.data)
     
 class DepartmentView(APIView):
@@ -113,10 +126,14 @@ class DepartmentView(APIView):
 
     @method_decorator(permission_required('hospital.view_department', raise_exception=True))
     def get(self, request, pk):
+        cached_data = cache.get(f'department_{pk}')
+        if cached_data is not None:
+            return Response(cached_data, status=status.HTTP_200_OK)
         department = self.get_object(pk)
         if not department:
             return Response(status.HTTP_400_BAD_REQUEST)
         serializer = DepartmentSerializer(department)
+        cache.set(f'department_{pk}', serializer.data, timeout=60*10)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @method_decorator(permission_required('hospital.change_department', raise_exception=True))
