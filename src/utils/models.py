@@ -18,7 +18,7 @@ class Log(models.Model):
     )
     
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    # The actual action description
+   
     action = models.TextField(max_length=1024)
     method = models.CharField(max_length=10, null=True)    
     metadata = models.JSONField(default=dict, blank=True)

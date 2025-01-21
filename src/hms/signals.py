@@ -23,21 +23,17 @@ import json
 
 def log_model_save(sender, instance, created, **kwargs):
     try:
-        # Get current request from thread local storage
+        # store request stuff in thread local storage( for the log )
         request = getattr(threading.current_thread(), '_current_request', None)
-        
-        # Prepare metadata
         metadata = {
             'model': sender.__name__,
             'instance_id': instance.id,
             'instance_data': str(instance)  # or a more detailed serialization if needed
         }
-
-        # Determine action type
         method = 'POST' if created else 'PUT/PATCH'
         action_type = 'Created' if created else 'Updated'
         
-        # Create log entry
+        # make log entry
         alog.log_action(
             action=f"{method} REQUEST: {action_type} {sender.__name__} Instance - {instance.id}",
             actor=getattr(request, 'jwt_user', None) if request else None,
@@ -63,17 +59,14 @@ def log_model_save(sender, instance, created, **kwargs):
 
 def log_model_delete(sender, instance, **kwargs):
     try:
-        # Get current request from thread local storage
         request = getattr(threading.current_thread(), '_current_request', None)
         
-        # Prepare metadata - capture instance data before deletion
         metadata = {
             'model': sender.__name__,
             'instance_id': instance.id,
-            'instance_data': str(instance)  # or a more detailed serialization if needed
+            'instance_data': str(instance)
         }
         
-        # Create log entry
         alog.log_action(
             action=f"DELETE REQUEST: Deleted {sender.__name__} Instance - {instance.id}",
             actor=getattr(request, 'jwt_user', None) if request else None,

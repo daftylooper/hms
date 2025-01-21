@@ -24,24 +24,24 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A patient with this email already exists.")
         return value
     
+    # encrypt phone number before saving the instance
     def create(self, validated_data):
-        # Encrypt phone number before saving the instance
         phone = validated_data.get('phone')
         if phone:
             validated_data['phone'] = self.cu.encrypt(str(phone))
         
         return super().create(validated_data)
     
+    # same thing as create, but for update
     def update(self, instance, validated_data):
-        # Encrypt phone number before updating the instance
         phone = validated_data.get('phone')
         if phone:
             validated_data['phone'] = self.cu.encrypt(str(phone))
         
         return super().update(instance, validated_data)
     
+    # decrypt phone number before returning the instance
     def to_representation(self, instance):
-        """Decrypt the password when returning data"""
         data = super().to_representation(instance)
         if 'phone' in data:
             # print("DA PHONE", data['phone'])
@@ -54,10 +54,9 @@ class VisitSerializer(serializers.ModelSerializer):
         model = Visit
         fields = "__all__"
 
+    # validate the required or misspelled fields
     def validate(self, data):
         required_fields = ['patient', 'doctor', 'hospital', 'department']
-        
-        # Check if all required fields are present
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
             raise serializers.ValidationError(
