@@ -10,7 +10,7 @@ click-plugins==1.1.1
 click-repl==0.3.0
 cron-descriptor==1.4.5
 cryptography==44.0.0
-Django==5.1.4
+Django==5.1.5
 django-celery-beat==2.7.0
 django-celery-results==2.5.1
 django-redis==5.4.0
