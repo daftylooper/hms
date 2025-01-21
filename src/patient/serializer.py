@@ -49,6 +49,19 @@ class PatientSerializer(serializers.ModelSerializer):
         return data
 
 class VisitSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Visit
         fields = "__all__"
+
+    def validate(self, data):
+        required_fields = ['patient', 'doctor', 'hospital', 'department']
+        
+        # Check if all required fields are present
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            raise serializers.ValidationError(
+                f"Missing/Mispelled required fields: {', '.join(missing_fields)}"
+            )
+
+        return data

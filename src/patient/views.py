@@ -14,6 +14,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth.decorators import permission_required
 from django.utils.decorators import method_decorator
 from django.core.exceptions import PermissionDenied
+from utils.crypto import CryptUtils
 import json
 import re
 import os
@@ -146,6 +147,10 @@ class VisitList(APIView):
     
     @method_decorator(permission_required('patient.change_visit', raise_exception=True))
     def post(self, request):
+        serializer = VisitSerializer(data=request.data)
+        if not serializer.validate(request.data):
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         data = request.data
         model_mapping = {
             "patient": Patient,
@@ -156,6 +161,7 @@ class VisitList(APIView):
 
         try:
             for key, model in model_mapping.items():
+
                 obj = get_object_or_404(model, name=data.get(key))
                 data[key] = obj.id
 
@@ -190,10 +196,7 @@ class VisitList(APIView):
     
 class VisitView(APIView):
     permission_classes = [IsAuthenticated]
-
-    def dispatch(self, request, *args, **kwargs):
-        request = decode_jwt(request)
-        return super().dispatch(request, *args, **kwargs)
+    cu = CryptUtils(os.getenv('DJANGO_SECRET_KEY'))
     
     def get_age(self, date):
         today = date.today()
@@ -228,7 +231,7 @@ class VisitView(APIView):
                 "name": patient.name,
                 "email": patient.email,
                 "address": patient.addr,
-                "phone": patient.phone,
+                "phone": self.cu.decrypt(patient.phone),
                 "age": self.get_age(patient.dob)
             },
             "visits": serializer.data
@@ -256,38 +259,56 @@ class VisitView(APIView):
 class StatusView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def dispatch(self, request, *args, **kwargs):
-        request = decode_jwt(request)
-        return super().dispatch(request, *args, **kwargs)
-
     def get_object(self, pk):
         try:
             return Visit.objects.get(pk=pk)
         except Visit.DoesNotExist:
             return None
 
-    @method_decorator(permission_required('patient.view_status', raise_exception=True))
+    @method_decorator(permission_required('patient.view_patient', raise_exception=True))
     @method_decorator(check_authorisation)
     def get(self, request, pk):
-        visit = self.get_object(pk)
-        if not visit:
-            return Response(status.HTTP_400_BAD_REQUEST)
-        serializer = VisitSerializer(visit)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        try:
+            patient = get_object_or_404(Patient, pk=pk)
+        except Patient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the latest visit for the patient
+        latest_visit = Visit.objects.filter(patient=patient).order_by('-timestamp').first()
+        
+        if not latest_visit:
+            return Response({"message": "No visits found for this patient"}, status=status.HTTP_404_NOT_FOUND)
+            
+        return Response({
+            "status": latest_visit.status,
+            "visit_id": latest_visit.id,
+            "timestamp": latest_visit.timestamp
+        }, status=status.HTTP_200_OK)
     
-    @method_decorator(permission_required('patient.change_status', raise_exception=True))
-    def put(self, request, pk):
+    @method_decorator(permission_required('patient.change_patient', raise_exception=True))
+    @method_decorator(check_authorisation)
+    def patch(self, request, pk):
         try:
             patient = get_object_or_404(Patient, pk=pk)
         except Patient.DoesNotExist:
             return Response({"error": "Patient not found"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Get the latest active visit (not discharged)
         visit = Visit.objects.filter(patient=patient).exclude(status=Visit.Status.DISCHARGED).order_by('-timestamp').first()
         if not visit:
-            return Response({"error": "No active visits, cannot change status"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "No active visits found for this patient"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = VisitSerializer(visit, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Validate the status
+        new_status = request.data.get("status")
+        if not new_status or new_status not in Visit.Status.values:
+            return Response({"error": "Invalid status value"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update the status
+        visit.status = new_status
+        visit.save()
+
+        return Response({
+            "status": visit.status,
+            "visit_id": visit.id,
+            "timestamp": visit.timestamp
+        }, status=status.HTTP_200_OK)
