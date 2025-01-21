@@ -1,11 +1,8 @@
 from django.test import TestCase
-<<<<<<< Updated upstream
-
-# Create your tests here.
-=======
 from .models import Doctor
 from hospital.models import Hospital, Department
 from utils.logger import Level, log
+from django.contrib.auth.models import User, Group, Permission
 
 class DoctorModelTest(TestCase):
     def setUp(self):
@@ -138,22 +135,40 @@ class DoctorViewTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIsInstance(response.json(), dict)
 
-    # def test_missing_required_fields(self):
-    #     data = {'name': "Dr. Invalid"}
-    #     response = self.client.post('/doctors', data=json.dumps(data), content_type='application/json')
-    #     self.assertEqual(response.status_code, 400)
+class DoctorAuthenticationAuthorizationTests(TestCase):
+    def setUp(self):
+        self.hospital = Hospital.objects.create(name="Test Hospital")
+        self.department = Department.objects.create(name="Test Department")
+        self.doctor = Doctor.objects.create(
+            name="Dr. Test",
+            hospital=self.hospital,
+            department=self.department
+        )
+        self.client = Client()
+        self.base_data = {
+            'name': 'Dr. New',
+            'hospital': 'Test Hospital',
+            'department': 'Test Department'
+        }
 
     def test_unauthorized_access(self):
         # Create new user without permissions
-        self.client.logout()
-        new_user = User.objects.create_user(username='noauth', password='noauth')
+        user = User.objects.create_user(username='noauth', password='noauth')
         self.client.login(username='noauth', password='noauth')
         
+        # Test all CRUD operations without permissions
         response = self.client.get('/doctors')
         self.assertEqual(response.status_code, 403)
+        
+        response = self.client.post('/doctors', data=json.dumps(self.base_data), content_type='application/json')
+        self.assertEqual(response.status_code, 403)
+        
+        response = self.client.get(f'/doctor/{self.doctor.id}')
+        self.assertEqual(response.status_code, 403)
+        
+        response = self.client.put(f'/doctor/{self.doctor.id}', data=json.dumps(self.base_data), content_type='application/json')
+        self.assertEqual(response.status_code, 403)
+        
+        response = self.client.delete(f'/doctor/{self.doctor.id}')
+        self.assertEqual(response.status_code, 403)
 
-
-
-
-
->>>>>>> Stashed changes

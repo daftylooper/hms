@@ -13,3 +13,4 @@ newrelic.ini
 newrelic-10.4.0/
 celerybeat-schedule
 newrelic-10.4.0.tar.gz
+logs/
