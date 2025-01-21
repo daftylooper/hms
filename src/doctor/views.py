@@ -8,6 +8,7 @@ from .serializer import *
 from django.contrib.auth.decorators import permission_required
 from django.utils.decorators import method_decorator
 from rest_framework.permissions import IsAuthenticated
+from django.core.cache import cache
 import json
 
 def get_hospital_id(hospital_name):
@@ -34,8 +35,12 @@ class DoctorList(APIView):
 
     @method_decorator(permission_required('doctor.view_doctor', raise_exception=True))
     def get(self, request):
+        cached_data = cache.get('doctor_list')
+        if cached_data is not None:
+            return Response(cached_data, status=status.HTTP_200_OK)
         doctors = Doctor.objects.all()
         serializer = DoctorSerializer(doctors, many=True)
+        cache.set('doctor_list', serializer.data, timeout=60*10)
         return Response(serializer.data)
     
     @method_decorator(permission_required('doctor.change_doctor', raise_exception=True))
@@ -78,10 +83,14 @@ class DoctorView(APIView):
 
     @method_decorator(permission_required('doctor.view_doctor', raise_exception=True))
     def get(self, request, pk):
+        cached_data = cache.get(f'doctor_{pk}')
+        if cached_data is not None:
+            return Response(cached_data, status=status.HTTP_200_OK)
         doctor = self.get_object(pk)
         if not doctor:
             return Response(status.HTTP_400_BAD_REQUEST)
         serializer = DoctorSerializer(doctor)
+        cache.set(f'doctor_{pk}', serializer.data, timeout=60*10)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @method_decorator(permission_required('doctor.change_doctor', raise_exception=True))

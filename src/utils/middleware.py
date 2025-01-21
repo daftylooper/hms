@@ -4,11 +4,11 @@ import threading
 
 class AuditLogMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        # Get IP address
+        # get ip addr
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         request.client_ip = x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
         
-        # Get user from JWT
+        # extract user_id from jwt
         try:
             jwt_auth = JWTAuthentication()
             header = jwt_auth.get_header(request)
@@ -25,9 +25,9 @@ class RequestMiddleware:
         self.get_response = get_response
         
     def __call__(self, request):
-        # Store request in thread local storage
+        # store request data in thread local storage, maybe can even use redis
         threading.current_thread()._current_request = request
         response = self.get_response(request)
-        # Clean up
+        # clean up
         delattr(threading.current_thread(), '_current_request')
         return response

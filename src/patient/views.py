@@ -15,9 +15,11 @@ from django.contrib.auth.decorators import permission_required
 from django.utils.decorators import method_decorator
 from django.core.exceptions import PermissionDenied
 from utils.crypto import CryptUtils
+from django.core.cache import cache
 import json
 import re
 import os
+import time
 
 # tries to match user_id and caller patient_id
 def check_authorisation(func):
@@ -40,8 +42,21 @@ class PatientList(APIView):
     def get(self, request):
         if not request.user.is_staff:
             return Response("You are not allowed", status=status.HTTP_403_FORBIDDEN)
+        
+        start_time_cache = time.time()
+        cached_data = cache.get('patient_list')
+        print("cached data", cached_data)
+        end_time_cache = time.time()
+        if cached_data is not None:
+            print(f"Cache hit: {(end_time_cache - start_time_cache)*1000} ms")
+            return Response(cached_data, status=status.HTTP_200_OK)
+
+        start_time_db = time.time()
         patients = Patient.objects.all()
         serializer = PatientSerializer(patients, many=True)
+        end_time_db = time.time()
+        print(f"Database hit: {(end_time_db - start_time_db)*1000} ms")
+        cache.set('patient_list', serializer.data, timeout=60*10)
         return Response(serializer.data)
     
     @method_decorator(permission_required('patient.change_patient', raise_exception=True))
@@ -83,10 +98,20 @@ class PatientView(APIView):
     @method_decorator(permission_required('patient.view_patient', raise_exception=True))
     @method_decorator(check_authorisation)
     def get(self, request, pk):
+        start_time_cache = time.time()
+        cache_data = cache.get(f'patient_{pk}')
+        end_time_cache = time.time()
+        if cache_data is not None:
+            print(f"Cache hit: {(end_time_cache - start_time_cache)*1000} ms")
+            return Response(cache_data, status=status.HTTP_200_OK)
+        start_time_db = time.time()
         visit = self.get_object(pk)
         if not visit:
             return Response(status.HTTP_400_BAD_REQUEST)
         serializer = PatientSerializer(visit)
+        cache.set(f'patient_{pk}', serializer.data, timeout=60*10)
+        end_time_db = time.time()
+        print(f"Database hit: {(end_time_db - start_time_db)*1000} ms")
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @method_decorator(permission_required('patient.change_patient', raise_exception=True))
@@ -107,7 +132,7 @@ class PatientView(APIView):
         visit = self.get_object(pk)
         if not visit:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        serializer = PatientSerializer(visit, data=request.data, partial=True)  # Use partial=True
+        serializer = PatientSerializer(visit, data=request.data, partial=True)  # partial because, we doing patach requst and it updates only the fields that are provided
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -165,7 +190,7 @@ class VisitList(APIView):
                 obj = get_object_or_404(model, name=data.get(key))
                 data[key] = obj.id
 
-            #dont record a visit of the patient if they haven't been discharged from other places yet
+            # dont record a visit of the patient if they haven't been discharged from other places yet
             patient_id = data["patient"]
             last_visit = Visit.objects.filter(patient_id=patient_id).order_by('-timestamp').first()
             if last_visit and last_visit.status != Visit.Status.DISCHARGED:
@@ -174,7 +199,7 @@ class VisitList(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            #check if the doctor is linked to the hospital and department
+            # check if the doctor is linked to the hospital and department
             hospital_id = data["hospital"]
             department_id = data["department"]
             doctor_id = data["doctor"]
@@ -223,7 +248,6 @@ class VisitView(APIView):
         if not visits.exists():
             return Response({"message": "No visits found for this patient"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Serialize the visits
         serializer = VisitSerializer(visits, many=True)
         return Response({
             "patient": {
@@ -272,10 +296,8 @@ class StatusView(APIView):
             patient = get_object_or_404(Patient, pk=pk)
         except Patient.DoesNotExist:
             return Response({"error": "Patient not found"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get the latest visit for the patient
+    
         latest_visit = Visit.objects.filter(patient=patient).order_by('-timestamp').first()
-        
         if not latest_visit:
             return Response({"message": "No visits found for this patient"}, status=status.HTTP_404_NOT_FOUND)
             
@@ -289,21 +311,17 @@ class StatusView(APIView):
     @method_decorator(check_authorisation)
     def patch(self, request, pk):
         try:
-            patient = get_object_or_404(Patient, pk=pk)
+            patient = get_object_or_404(Patient, pk        # Get the latest active visit (not discharged)
+=pk)
         except Patient.DoesNotExist:
             return Response({"error": "Patient not found"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get the latest active visit (not discharged)
         visit = Visit.objects.filter(patient=patient).exclude(status=Visit.Status.DISCHARGED).order_by('-timestamp').first()
         if not visit:
             return Response({"error": "No active visits found for this patient"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Validate the status
         new_status = request.data.get("status")
         if not new_status or new_status not in Visit.Status.values:
             return Response({"error": "Invalid status value"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Update the status
         visit.status = new_status
         visit.save()
 
